@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>platform-auth</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>platform-auth</name>
+
+    <parent>
+        <groupId>com.jaagro</groupId>
+        <artifactId>platform-parent</artifactId>
+        <version>1.0-SNAPSHOT</version>
+        <relativePath>../jaagro-platform-parent/pom.xml</relativePath> <!-- lookup parent from repository -->
+    </parent>
+
+    <properties>
+        <api.version>0.0.1-RELEASE</api.version>
+        <biz.version>0.0.1-RELEASE</biz.version>
+    </properties>
+
+    <modules>
+        <module>auth-api</module>
+        <module>auth-biz</module>
+        <module>auth-web</module>
+    </modules>
+
+</project>
