@@ -1,7 +1,7 @@
 package com.jaagro.auth.api.service;
 
 import com.auth0.jwt.interfaces.Claim;
-import com.jaagro.auth.api.dto.UserDto;
+import com.jaagro.auth.api.dto.UserInfo;
 
 import java.util.Map;
 
@@ -11,19 +11,21 @@ import java.util.Map;
 public interface AuthService {
     /**
      * 获取token
-     * @param username
-     * @param password
+     * @param username 用户名
+     * @param password 密码
+     * @param userType 登录用户的类型
      * @return
      */
-    Map<String, Object> createTokenByPassword(String username, String password);
+    Map<String, Object> createTokenByPassword(String username, String password, String userType);
 
     /**
      * 获取token
      * @param phoneNumber 手机号码
      * @param verificationCode 验证码
+     * @param userType 登录用户的类型
      * @return token
      */
-    Map<String, Object> createTokenByPhone(String phoneNumber, String verificationCode);
+    Map<String, Object> createTokenByPhone(String phoneNumber, String verificationCode, String userType);
 
     /**
      * 注销token
@@ -52,5 +54,5 @@ public interface AuthService {
      * @return 封装后的userDto
      * @throws  Exception 解析token时有可能会抛出异常
      */
-    UserDto getUserByToken(String token) throws Exception;
+    UserInfo getUserByToken(String token) throws Exception;
 }

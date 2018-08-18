@@ -1,6 +1,6 @@
 package com.jaagro.auth.api.service;
 
-import com.jaagro.auth.api.dto.UserDto;
+import com.jaagro.auth.api.dto.UserInfo;
 import org.springframework.cloud.netflix.feign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,26 +13,29 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface UserClientService {
 
     /**
-     * 通过username获取userDto
-     * @param username username
+     * 通过username获取userInfo
+     * @param username 用户名
+     * @param userType 账号类型
      * @return
      */
     @GetMapping("/getByUsername")
-    UserDto getByName(@RequestParam("username") String username);
+    UserInfo getByName(@RequestParam("username") String username, @RequestParam("userType") String userType);
 
     /**
-     * 通过手机号获取userDto
-     * @param phoneNumber
+     * 通过手机号获取userInfo
+     * @param phoneNumber 手机号码
+     * @param userType 账号类型
      * @return
      */
     @GetMapping("/getByPhoneNumber")
-    UserDto getByPhone(@RequestParam("phoneNumber") String phoneNumber);
+    UserInfo getByPhone(@RequestParam("phoneNumber") String phoneNumber, @RequestParam("userType") String userType);
 
     /**
      * 通过id获取userDto
-     * @param id
+     * @param id 用户id
+     * @param userType 账号类型
      * @return
      */
     @GetMapping("/getById")
-    UserDto getById(@RequestParam("id") Long id);
+    UserInfo getById(@RequestParam("id") Long id, @RequestParam("userType") String userType);
 }

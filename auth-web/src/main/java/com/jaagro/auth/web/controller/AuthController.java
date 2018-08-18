@@ -1,7 +1,7 @@
 package com.jaagro.auth.web.controller;
 
 import com.auth0.jwt.interfaces.Claim;
-import com.jaagro.auth.api.dto.UserDto;
+import com.jaagro.auth.api.dto.UserInfo;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.auth.api.service.UserClientService;
@@ -35,11 +35,12 @@ public class AuthController {
      */
     @PostMapping("/token")
     public BaseResponse getTokenByPassword(@RequestParam("username") String username,
-                                           @RequestParam("password") String password) {
-        if(userClientService.getByName(username) == null){
+                                           @RequestParam("password") String password,
+                                           @RequestParam("userType") String userType) {
+        if(userClientService.getByName(username, userType) == null){
             return BaseResponse.errorInstance(username + " :当前用户不存在");
         }
-        Map<String, Object> map = authService.createTokenByPassword(username, password);
+        Map<String, Object> map = authService.createTokenByPassword(username, password, userType);
         return BaseResponse.service(map);
     }
 
@@ -51,8 +52,9 @@ public class AuthController {
      */
     @GetMapping("/token")
     public BaseResponse getTokenByPhone(@RequestParam("phoneNumber") String phoneNumber,
-                                        @RequestParam("verificationCode") String verificationCode){
-        UserDto user = userClientService.getByPhone(phoneNumber);
+                                        @RequestParam("verificationCode") String verificationCode,
+                                        @RequestParam("userType") String userType){
+        UserInfo user = userClientService.getByPhone(phoneNumber, userType);
         if(user == null){
             return BaseResponse.errorInstance(phoneNumber + " :未注册");
         }
@@ -60,7 +62,7 @@ public class AuthController {
             return BaseResponse.errorInstance("验证码不正确");
         }
 
-        Map<String, Object> map = authService.createTokenByPhone(phoneNumber, verificationCode);
+        Map<String, Object> map = authService.createTokenByPhone(phoneNumber, verificationCode, userType);
         return BaseResponse.service(map);
     }
 
@@ -96,13 +98,13 @@ public class AuthController {
      * @return
      */
     @PostMapping("/getUserByToken")
-    public UserDto getUserByToken(String token){
-        UserDto userDto = null;
+    public UserInfo getUserByToken(String token){
+        UserInfo userInfo = null;
         try {
-            userDto = authService.getUserByToken(token);
+            userInfo = authService.getUserByToken(token);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return userDto;
+        return userInfo;
     }
 }
