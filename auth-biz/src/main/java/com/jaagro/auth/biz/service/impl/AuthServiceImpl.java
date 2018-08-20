@@ -5,6 +5,7 @@ import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.jaagro.auth.api.constant.LoginType;
 import com.jaagro.auth.api.dto.UserInfo;
 import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
@@ -51,7 +52,7 @@ public class AuthServiceImpl implements AuthService {
     public Map<String, Object> createTokenByPassword(String username, String password, String userType) {
 
         //判断user是否有效
-        UserInfo user = userClientService.getByName(username, userType);
+        UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
         String encodePassword = MD5Utils.encode(password, user.getSalt());
         if(!encodePassword.equals(user.getPassword())){
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "用户名或密码错误");
@@ -61,7 +62,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Map<String, Object> createTokenByPhone(String phoneNumber, String verificationCode, String userType) {
-        UserInfo user = userClientService.getByPhone(phoneNumber, userType);
+        UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
         if(user == null){
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "手机号码未注册");
         }
@@ -146,7 +147,7 @@ public class AuthServiceImpl implements AuthService {
         //目前框架的逻辑，通过user来判断token是否有效
         if(!StringUtils.isEmpty(userIdStr)){
             Long userId = Long.valueOf(userIdStr);
-            userInfo = userClientService.getById(userId, userType);
+            userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
         }
 
         //用于兼容老系统的token,后期重构完成后可删除

@@ -13,29 +13,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface UserClientService {
 
     /**
-     * 通过username获取userInfo
-     * @param username 用户名
-     * @param userType 账号类型
-     * @return
+     * 获取userInfo
+     * @param key 查询user的参数: 可以是loginName, phoneNumber, id 任意一种
+     * @param userType 类型有三种：customer， employee， driver
+     * @param loginType 类型有三种： loginName, phoneNumber, id
+     * @return userInfo对象
      */
-    @GetMapping("/getByUsername")
-    UserInfo getByName(@RequestParam("username") String username, @RequestParam("userType") String userType);
-
-    /**
-     * 通过手机号获取userInfo
-     * @param phoneNumber 手机号码
-     * @param userType 账号类型
-     * @return
-     */
-    @GetMapping("/getByPhoneNumber")
-    UserInfo getByPhone(@RequestParam("phoneNumber") String phoneNumber, @RequestParam("userType") String userType);
-
-    /**
-     * 通过id获取userDto
-     * @param id 用户id
-     * @param userType 账号类型
-     * @return
-     */
-    @GetMapping("/getById")
-    UserInfo getById(@RequestParam("id") Long id, @RequestParam("userType") String userType);
+    @GetMapping("/getUserInfo")
+    UserInfo getUserInfo(@RequestParam("key") Object key, @RequestParam("userType") String userType, @RequestParam("loginType") String loginType);
 }

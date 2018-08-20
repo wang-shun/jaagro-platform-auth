@@ -1,10 +1,12 @@
 package com.jaagro.auth.web.controller;
 
 import com.auth0.jwt.interfaces.Claim;
+import com.jaagro.auth.api.constant.LoginType;
 import com.jaagro.auth.api.dto.UserInfo;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.auth.api.service.UserClientService;
+import io.swagger.annotations.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,8 +38,8 @@ public class AuthController {
     @PostMapping("/token")
     public BaseResponse getTokenByPassword(@RequestParam("username") String username,
                                            @RequestParam("password") String password,
-                                           @RequestParam("userType") String userType) {
-        if(userClientService.getByName(username, userType) == null){
+                                           @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType) {
+        if(userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME) == null){
             return BaseResponse.errorInstance(username + " :当前用户不存在");
         }
         Map<String, Object> map = authService.createTokenByPassword(username, password, userType);
@@ -53,8 +55,8 @@ public class AuthController {
     @GetMapping("/token")
     public BaseResponse getTokenByPhone(@RequestParam("phoneNumber") String phoneNumber,
                                         @RequestParam("verificationCode") String verificationCode,
-                                        @RequestParam("userType") String userType){
-        UserInfo user = userClientService.getByPhone(phoneNumber, userType);
+                                        @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType){
+        UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
         if(user == null){
             return BaseResponse.errorInstance(phoneNumber + " :未注册");
         }
