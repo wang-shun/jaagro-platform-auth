@@ -6,19 +6,20 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jaagro.auth.api.constant.LoginType;
-import com.jaagro.auth.api.dto.UserInfo;
 import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.UserClientService;
+import com.jaagro.auth.api.service.VerificationCodeClientService;
+import com.jaagro.constant.UserInfo;
+import com.jaagro.utils.MD5Utils;
+import com.jaagro.utils.ResponseStatusCode;
+import com.jaagro.utils.ServiceResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import utils.MD5Utils;
-import utils.ResponseStatusCode;
-import utils.ServiceResult;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Calendar;
@@ -35,6 +36,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Autowired
     private UserClientService userClientService;
+    @Autowired
+    private VerificationCodeClientService verificationCodeClientService;
 
     private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
@@ -53,6 +56,9 @@ public class AuthServiceImpl implements AuthService {
 
         //判断user是否有效
         UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
+        if(user == null){
+            return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), username + " :用户名不存在");
+        }
         String encodePassword = MD5Utils.encode(password, user.getSalt());
         if(!encodePassword.equals(user.getPassword())){
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "用户名或密码错误");
@@ -65,6 +71,9 @@ public class AuthServiceImpl implements AuthService {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
         if(user == null){
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "手机号码未注册");
+        }
+        if(!verificationCodeClientService.existMessage(phoneNumber, verificationCode)){
+            return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "验证码不正确");
         }
         return createToken(user);
     }
@@ -138,7 +147,10 @@ public class AuthServiceImpl implements AuthService {
             jwt = verifier.verify(token);
         }catch (Exception e){
             e.printStackTrace();
-            return new UserInfo().setId(-9999L).setLoginName("当前令牌无效");
+            UserInfo userInfo = new UserInfo();
+            userInfo.setId(-9999);
+            userInfo.setLoginName("当前令牌无效");
+            return userInfo;
         }
         String userIdStr = jwt.getClaim("user").asString();
         String userType = jwt.getClaim("userType").asString();

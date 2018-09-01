@@ -1,7 +1,7 @@
 package com.jaagro.auth.api.service;
 
 import com.auth0.jwt.interfaces.Claim;
-import com.jaagro.auth.api.dto.UserInfo;
+import com.jaagro.constant.UserInfo;
 
 import java.util.Map;
 
