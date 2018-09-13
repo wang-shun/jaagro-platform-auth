@@ -99,4 +99,15 @@ public class AuthController {
         }
         return userInfo;
     }
+
+    /**
+     * 提供给其他服务
+     * @param id
+     * @param userType
+     * @return
+     */
+    @PostMapping("getUserById")
+    public UserInfo getUserInfoById(@RequestParam("id") Integer id, @RequestParam("userType") String userType){
+        return userClientService.getUserInfo(id, userType, "id");
+    }
 }
