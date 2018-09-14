@@ -49,6 +49,13 @@ public interface AuthService {
     Map<String, Claim> verifyToken(String token) throws Exception;
 
     /**
+     * 判断token是否为有效状态
+     * @param token
+     * @return
+     */
+    Boolean validToken(String token);
+
+    /**
      * 通过token获取user
      * @param token token
      * @return 封装后的userDto

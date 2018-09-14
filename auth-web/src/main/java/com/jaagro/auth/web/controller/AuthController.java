@@ -7,6 +7,8 @@ import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
 import io.swagger.annotations.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,12 +67,7 @@ public class AuthController {
      */
     @PostMapping("/verifyToken")
     public boolean verifyToken(String token){
-        try {
-            authService.verifyToken(token);
-        } catch (Exception e) {
-            return false;
-        }
-        return true;
+        return authService.validToken(token);
     }
 
     @PostMapping("/decodeToken")

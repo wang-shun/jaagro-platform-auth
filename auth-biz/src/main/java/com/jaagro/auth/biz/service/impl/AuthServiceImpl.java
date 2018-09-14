@@ -29,6 +29,7 @@ import java.util.Map;
 
 /**
  * 提供给feign调用，主要用于gateway层获取和验证token
+ *
  * @author tony
  */
 @Service
@@ -56,11 +57,11 @@ public class AuthServiceImpl implements AuthService {
 
         //判断user是否有效
         UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
-        if(user == null){
+        if (user == null) {
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), username + " :用户名不存在");
         }
         String encodePassword = MD5Utils.encode(password, user.getSalt());
-        if(!encodePassword.equals(user.getPassword())){
+        if (!encodePassword.equals(user.getPassword())) {
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "用户名或密码错误");
         }
         return createToken(user);
@@ -69,16 +70,16 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Map<String, Object> createTokenByPhone(String phoneNumber, String verificationCode, String userType) {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
-        if(user == null){
+        if (user == null) {
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "手机号码未注册");
         }
-        if(!verificationCodeClientService.existMessage(phoneNumber, verificationCode)){
+        if (!verificationCodeClientService.existMessage(phoneNumber, verificationCode)) {
             return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "验证码不正确");
         }
         return createToken(user);
     }
 
-    private Map<String, Object> createToken(UserInfo user){
+    private Map<String, Object> createToken(UserInfo user) {
         //签发时间
         Date iatDate = new Date();
 
@@ -107,6 +108,7 @@ public class AuthServiceImpl implements AuthService {
                     .sign(Algorithm.HMAC256(SECRET_KET));
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
+            log.warn(e.getMessage() + ": 令牌生成失败，请重新操作");
             return ServiceResult.error("令牌生成失败，请重新操作");
         }
         return ServiceResult.toResult(token);
@@ -128,14 +130,27 @@ public class AuthServiceImpl implements AuthService {
         DecodedJWT jwt = null;
         try {
             jwt = verifier.verify(token);
-        }catch (Exception e){
+        } catch (Exception e) {
+            log.warn(e.getMessage() + ": 令牌无效或已过期");
             throw new AuthorizationException("令牌无效或已过期");
         }
         return jwt.getClaims();
     }
 
+    @Override
+    public Boolean validToken(String token) {
+        try {
+            this.verifyToken(token);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
     /**
      * 通过token获取user
+     *
      * @param token token
      * @return 封装后的userDto
      */
@@ -145,26 +160,27 @@ public class AuthServiceImpl implements AuthService {
         DecodedJWT jwt = null;
         try {
             jwt = verifier.verify(token);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
-            UserInfo userInfo = new UserInfo();
-            userInfo.setId(-9999);
-            userInfo.setLoginName("当前令牌无效");
-            return userInfo;
+//            UserInfo userInfo = new UserInfo();
+//            userInfo.setId(-9999);
+//            userInfo.setLoginName("当前令牌无效");
+            log.warn(e.getMessage() + ": 当前令牌无效");
+            return null;
         }
         String userIdStr = jwt.getClaim("user").asString();
         String userType = jwt.getClaim("userType").asString();
         //需要查出user对象封装并返回
         UserInfo userInfo = new UserInfo();
         //目前框架的逻辑，通过user来判断token是否有效
-        if(!StringUtils.isEmpty(userIdStr)){
+        if (!StringUtils.isEmpty(userIdStr)) {
             Long userId = Long.valueOf(userIdStr);
             userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
         }
 
         //用于兼容老系统的token,后期重构完成后可删除
         String username = jwt.getClaim("user_name").asString();
-        if(!StringUtils.isEmpty(username)){
+        if (!StringUtils.isEmpty(username)) {
             userInfo.setLoginName(username);
         }
         return userInfo;
