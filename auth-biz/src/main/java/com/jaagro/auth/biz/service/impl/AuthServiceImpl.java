@@ -3,10 +3,8 @@ package com.jaagro.auth.biz.service.impl;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jaagro.auth.api.constant.LoginType;
-import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
@@ -18,14 +16,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.io.UnsupportedEncodingException;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 提供给feign调用，主要用于gateway层获取和验证token
@@ -35,12 +33,14 @@ import java.util.Map;
 @Service
 public class AuthServiceImpl implements AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
+
     @Autowired
     private UserClientService userClientService;
     @Autowired
     private VerificationCodeClientService verificationCodeClientService;
-
-    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     /**
      * 秘钥
@@ -84,9 +84,9 @@ public class AuthServiceImpl implements AuthService {
         Date iatDate = new Date();
 
         //token过期时间
-        Calendar nowTime = Calendar.getInstance();
-        nowTime.add(Calendar.MINUTE, 60 * 12);
-        Date expiresDate = nowTime.getTime();
+//        Calendar nowTime = Calendar.getInstance();
+//        nowTime.add(Calendar.MINUTE, 20);
+//        Date expiresDate = nowTime.getTime();
 
         Map<String, Object> map = new HashMap<>(16);
         map.put("alg", "HS256");
@@ -101,14 +101,15 @@ public class AuthServiceImpl implements AuthService {
                     .withClaim("user", user.getId().toString())
                     .withClaim("userType", user.getUserType())
                     //设置过期时间，过期时间必须大于签发时间
-                    .withExpiresAt(expiresDate)
+//                    .withExpiresAt(expiresDate)
                     //设置签发时间
                     .withIssuedAt(iatDate)
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KET));
-        } catch (UnsupportedEncodingException e) {
+            redisTemplate.opsForValue().set(token, user.getId().toString(), 3, TimeUnit.DAYS);
+        } catch (Exception e) {
             e.printStackTrace();
-            log.warn(e.getMessage() + ": 令牌生成失败，请重新操作");
+            log.error(e + ": 令牌生成失败");
             return ServiceResult.error("令牌生成失败，请重新操作");
         }
         return ServiceResult.toResult(token);
@@ -125,65 +126,56 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Map<String, Claim> verifyToken(String token) throws Exception {
-        JWTVerifier verifier = JWT.require(Algorithm.HMAC256(SECRET_KET)).build();
-        DecodedJWT jwt = null;
-        try {
-            jwt = verifier.verify(token);
-        } catch (Exception e) {
-            log.warn(e.getMessage() + ": 令牌无效或已过期");
-            throw new AuthorizationException("令牌无效或已过期");
-        }
-        return jwt.getClaims();
-    }
-
-    @Override
-    public Boolean validToken(String token) {
-        try {
-            this.verifyToken(token);
-        } catch (Exception e) {
-            e.printStackTrace();
+    public boolean postpone(String token) {
+        //存在的意义：有部分请求是不需要token的
+        if (StringUtils.isEmpty(token)) {
             return false;
         }
-        return true;
+        if (!StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
+            redisTemplate.expire(token, 3, TimeUnit.DAYS);
+            return true;
+        }
+        log.warn(token + " :该token无效，延期失败！");
+        return false;
     }
 
-    /**
-     * 通过token获取user
-     *
-     * @param token token
-     * @return 封装后的userDto
-     */
+    @Override
+    public boolean verifyToken(String token) {
+        String flg = null;
+        if (!StringUtils.isEmpty(token)) {
+            flg = redisTemplate.opsForValue().get(token);
+        }
+        if (!StringUtils.isEmpty(flg)) {
+            return true;
+        }
+        log.warn(token + ":该token无效。userId: " + flg);
+        return false;
+    }
+
     @Override
     public UserInfo getUserByToken(String token) throws Exception {
+        if (StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
+            log.warn(token + ": token无效");
+            return null;
+        }
         JWTVerifier verifier = JWT.require(Algorithm.HMAC256(SECRET_KET)).build();
-        DecodedJWT jwt = null;
+        DecodedJWT jwt;
         try {
             jwt = verifier.verify(token);
         } catch (Exception e) {
             e.printStackTrace();
-//            UserInfo userInfo = new UserInfo();
-//            userInfo.setId(-9999);
-//            userInfo.setLoginName("当前令牌无效");
-            log.warn(e.getMessage() + ": 当前令牌无效");
+            log.warn(e + ": token解析出错");
             return null;
         }
         String userIdStr = jwt.getClaim("user").asString();
         String userType = jwt.getClaim("userType").asString();
         //需要查出user对象封装并返回
         UserInfo userInfo = new UserInfo();
-        //目前框架的逻辑，通过user来判断token是否有效
+        //通过user来判断token是否有效
         if (!StringUtils.isEmpty(userIdStr)) {
-            Long userId = Long.valueOf(userIdStr);
+            Integer userId = Integer.valueOf(userIdStr);
             userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
-        }
-
-        //用于兼容老系统的token,后期重构完成后可删除
-        String username = jwt.getClaim("user_name").asString();
-        if (!StringUtils.isEmpty(username)) {
-            userInfo.setLoginName(username);
         }
         return userInfo;
     }
-
 }
