@@ -41,19 +41,19 @@ public interface AuthService {
     String refresh(String token);
 
     /**
+     * 延期token
+     * @param token
+     * @return
+     */
+    boolean postpone(String token);
+
+    /**
      * 验证token
      * @param token
      * @return
      * @throws Exception
      */
-    Map<String, Claim> verifyToken(String token) throws Exception;
-
-    /**
-     * 判断token是否为有效状态
-     * @param token
-     * @return
-     */
-    Boolean validToken(String token);
+    boolean verifyToken(String token);
 
     /**
      * 通过token获取user
