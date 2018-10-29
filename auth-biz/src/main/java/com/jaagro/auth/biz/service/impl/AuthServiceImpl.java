@@ -106,7 +106,7 @@ public class AuthServiceImpl implements AuthService {
                     .withIssuedAt(iatDate)
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KET));
-            redisTemplate.opsForValue().set(token, user.getId().toString(), 3, TimeUnit.DAYS);
+            redisTemplate.opsForValue().set(token, user.getId().toString(), 7, TimeUnit.DAYS);
         } catch (Exception e) {
             e.printStackTrace();
             log.error(e + ": 令牌生成失败");
