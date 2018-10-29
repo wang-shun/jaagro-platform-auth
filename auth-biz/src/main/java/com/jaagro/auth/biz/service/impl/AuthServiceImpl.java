@@ -5,6 +5,7 @@ import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jaagro.auth.api.constant.LoginType;
+import com.jaagro.auth.api.constant.UserType;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
@@ -45,11 +46,11 @@ public class AuthServiceImpl implements AuthService {
     /**
      * 秘钥
      */
-    private static String SECRET_KET;
+    private static String SECRET_KEY;
 
     @Value("${jwt.secret.key}")
     public void setSecretKet(String secretKet) {
-        SECRET_KET = secretKet;
+        SECRET_KEY = secretKet;
     }
 
     @Override
@@ -82,7 +83,6 @@ public class AuthServiceImpl implements AuthService {
     private Map<String, Object> createToken(UserInfo user) {
         //签发时间
         Date iatDate = new Date();
-
         //token过期时间
 //        Calendar nowTime = Calendar.getInstance();
 //        nowTime.add(Calendar.MINUTE, 20);
@@ -105,13 +105,19 @@ public class AuthServiceImpl implements AuthService {
                     //设置签发时间
                     .withIssuedAt(iatDate)
                     //加密
-                    .sign(Algorithm.HMAC256(SECRET_KET));
-            redisTemplate.opsForValue().set(token, user.getId().toString(), 7, TimeUnit.DAYS);
+                    .sign(Algorithm.HMAC256(SECRET_KEY));
+            if (UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType())) {
+                redisTemplate.opsForValue().set(token, user.getId().toString(), 31, TimeUnit.DAYS);
+            } else {
+                redisTemplate.opsForValue().set(token, user.getId().toString(), 7, TimeUnit.DAYS);
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
             log.error(e + ": 令牌生成失败");
             return ServiceResult.error("令牌生成失败，请重新操作");
         }
+
         return ServiceResult.toResult(token);
     }
 
@@ -127,12 +133,24 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean postpone(String token) {
-        //存在的意义：有部分请求是不需要token的
+        UserInfo userInfo = null;
+        //解析token
+        try {
+            userInfo = this.getUserByToken(token);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        //有部分请求是不需要token的,故过滤掉这部分
         if (StringUtils.isEmpty(token)) {
             return false;
         }
         if (!StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
-            redisTemplate.expire(token, 3, TimeUnit.DAYS);
+            if(UserType.DRIVER.equals(userInfo.getUserType())){
+                redisTemplate.expire(token, 31, TimeUnit.DAYS);
+            } else {
+                redisTemplate.expire(token, 7, TimeUnit.DAYS);
+            }
+
             return true;
         }
         log.warn(token + " :该token无效，延期失败！");
@@ -158,7 +176,7 @@ public class AuthServiceImpl implements AuthService {
             log.warn(token + ": token无效");
             return null;
         }
-        JWTVerifier verifier = JWT.require(Algorithm.HMAC256(SECRET_KET)).build();
+        JWTVerifier verifier = JWT.require(Algorithm.HMAC256(SECRET_KEY)).build();
         DecodedJWT jwt;
         try {
             jwt = verifier.verify(token);
