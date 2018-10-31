@@ -86,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String getTokenByWxId(String wxId) {
         String tokenData = redisTemplate.opsForValue().get(wxId);
-        if(StringUtils.isEmpty(tokenData)){
+        if (StringUtils.isEmpty(tokenData)) {
             throw new NullPointerException("微信id无效");
         }
         return tokenData;
@@ -122,9 +122,9 @@ public class AuthServiceImpl implements AuthService {
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KEY));
             if (UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType())) {
-                redisTemplate.opsForValue().set(token, user.getId().toString() + "," + wxId, 31, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 31, TimeUnit.DAYS);
             } else {
-                redisTemplate.opsForValue().set(token, user.getId().toString() + "," + wxId, 7, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 7, TimeUnit.DAYS);
             }
             //微信小程序专属
             if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
@@ -164,7 +164,7 @@ public class AuthServiceImpl implements AuthService {
         }
         String tokenRedis = redisTemplate.opsForValue().get(token);
         String wxId = tokenRedis.substring(tokenRedis.indexOf(",") + 1);
-        if (!StringUtils.isEmpty(wxId) && !"null".equals(wxId)){
+        if (!StringUtils.isEmpty(wxId)) {
             log.info("当前用户是微信小程序用户，wxId: " + wxId);
         }
         if (!StringUtils.isEmpty(tokenRedis)) {
