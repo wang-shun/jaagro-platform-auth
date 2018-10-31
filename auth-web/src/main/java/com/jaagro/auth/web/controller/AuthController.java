@@ -1,6 +1,5 @@
 package com.jaagro.auth.web.controller;
 
-import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
@@ -57,6 +56,7 @@ public class AuthController {
 
     /**
      * 通过wxId获取token
+     *
      * @param wxId
      * @return
      */
@@ -95,7 +95,7 @@ public class AuthController {
     }
 
     /**
-     * 延期token，用户每次请求api 都将调用此方法延长token在redis中的有效期（3天）
+     * 延期token，用户每次请求api 都将调用此方法延长token在redis中的有效期
      *
      * @param token
      * @return

@@ -2,7 +2,6 @@ package com.jaagro.auth.web.controller;
 
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
-import org.springframework.beans.BeanUtils;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
