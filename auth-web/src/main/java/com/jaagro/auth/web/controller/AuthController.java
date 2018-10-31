@@ -1,18 +1,14 @@
 package com.jaagro.auth.web.controller;
 
+import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
-import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.auth.api.service.UserClientService;
+import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
-import io.swagger.annotations.*;
+import io.swagger.annotations.ApiParam;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * @author tony
@@ -39,8 +35,8 @@ public class AuthController {
                                            @RequestParam("password") String password,
                                            @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType) {
 
-        Map<String, Object> map = authService.createTokenByPassword(username, password, userType);
-        return BaseResponse.service(map);
+        String token = authService.createTokenByPassword(username, password, userType);
+        return BaseResponse.successInstance((Object) token);
     }
 
     /**
@@ -53,10 +49,20 @@ public class AuthController {
     @GetMapping("/token")
     public BaseResponse getTokenByPhone(@RequestParam("phoneNumber") String phoneNumber,
                                         @RequestParam("verificationCode") String verificationCode,
-                                        @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType) {
+                                        @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType,
+                                        @RequestParam(value = "wxId", required = false) String wxId) {
+        String token = authService.createTokenByPhone(phoneNumber, verificationCode, userType, wxId);
+        return BaseResponse.successInstance((Object) token);
+    }
 
-        Map<String, Object> map = authService.createTokenByPhone(phoneNumber, verificationCode, userType);
-        return BaseResponse.service(map);
+    /**
+     * 通过wxId获取token
+     * @param wxId
+     * @return
+     */
+    @PostMapping("/getTokenByWxId/{wxId}")
+    public BaseResponse getTokenByWxId(@PathVariable("wxId") String wxId) {
+        return BaseResponse.successInstance(authService.getTokenByWxId(wxId));
     }
 
     /**
@@ -78,6 +84,7 @@ public class AuthController {
      */
     @PostMapping("/getUserByToken")
     public UserInfo getUserByToken(String token) {
+
         UserInfo userInfo = null;
         try {
             userInfo = authService.getUserByToken(token);
@@ -89,11 +96,12 @@ public class AuthController {
 
     /**
      * 延期token，用户每次请求api 都将调用此方法延长token在redis中的有效期（3天）
+     *
      * @param token
      * @return
      */
     @PostMapping("/postponeToken")
-    public boolean postponeToken(String token) {
+    public boolean postponeToken(@RequestParam("token") String token) {
         return authService.postpone(token);
     }
 

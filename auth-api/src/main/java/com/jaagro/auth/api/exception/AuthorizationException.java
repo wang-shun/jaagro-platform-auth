@@ -3,7 +3,7 @@ package com.jaagro.auth.api.exception;
 /**
  * @author tony
  */
-public class AuthorizationException extends Exception {
+public class AuthorizationException extends RuntimeException {
 
     /**
      * Constructs a new exception with the specified detail message.  The

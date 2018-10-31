@@ -1,6 +1,6 @@
 package com.jaagro.auth.api.service;
 
-import com.auth0.jwt.interfaces.Claim;
+import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.constant.UserInfo;
 
 import java.util.Map;
@@ -14,18 +14,28 @@ public interface AuthService {
      * @param username 用户名
      * @param password 密码
      * @param userType 登录用户的类型
+     * @throws  AuthorizationException
      * @return
      */
-    Map<String, Object> createTokenByPassword(String username, String password, String userType);
+    String createTokenByPassword(String username, String password, String userType);
 
     /**
      * 获取token
      * @param phoneNumber 手机号码
      * @param verificationCode 验证码
      * @param userType 登录用户的类型
+     * @param wxId 微信Id
+     * @throws AuthorizationException
      * @return token
      */
-    Map<String, Object> createTokenByPhone(String phoneNumber, String verificationCode, String userType);
+    String createTokenByPhone(String phoneNumber, String verificationCode, String userType, String wxId);
+
+    /**
+     * 通过微信id获取token：主要用于微信小程序
+     * @param wxId
+     * @return
+     */
+    String getTokenByWxId(String wxId);
 
     /**
      * 注销token

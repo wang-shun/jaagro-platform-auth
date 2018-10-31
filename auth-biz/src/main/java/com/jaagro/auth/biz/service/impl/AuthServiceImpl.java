@@ -6,6 +6,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jaagro.auth.api.constant.LoginType;
 import com.jaagro.auth.api.constant.UserType;
+import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
@@ -15,10 +16,12 @@ import com.jaagro.utils.ResponseStatusCode;
 import com.jaagro.utils.ServiceResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 import java.util.Date;
@@ -54,33 +57,45 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Map<String, Object> createTokenByPassword(String username, String password, String userType) {
+    public String createTokenByPassword(String username, String password, String userType) {
 
         //判断user是否有效
         UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
         if (user == null) {
-            return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), username + " :用户名不存在");
+            throw new AuthorizationException(username + " :用户名不存在");
         }
         String encodePassword = MD5Utils.encode(password, user.getSalt());
         if (!encodePassword.equals(user.getPassword())) {
-            return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "用户名或密码错误");
+            throw new AuthorizationException("用户名或密码错误");
         }
-        return createToken(user);
+        return createToken(user, null);
     }
 
     @Override
-    public Map<String, Object> createTokenByPhone(String phoneNumber, String verificationCode, String userType) {
+    public String createTokenByPhone(String phoneNumber, String verificationCode, String userType, String wxId) {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
         if (user == null) {
-            return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "手机号码未注册");
+            throw new AuthorizationException("手机号码未注册");
         }
         if (!verificationCodeClientService.existMessage(phoneNumber, verificationCode)) {
-            return ServiceResult.error(ResponseStatusCode.UNAUTHORIZED_ERROR.getCode(), "验证码不正确");
+            throw new AuthorizationException("验证码不正确");
         }
-        return createToken(user);
+        return createToken(user, wxId);
     }
 
-    private Map<String, Object> createToken(UserInfo user) {
+    @Override
+    public String getTokenByWxId(String wxId) {
+        String tokenData = redisTemplate.opsForValue().get(wxId);
+        if(StringUtils.isEmpty(tokenData)){
+            throw new NullPointerException("微信id无效");
+        }
+        return tokenData;
+    }
+
+    private String createToken(UserInfo user, String wxId) throws AuthorizationException {
+
+        Assert.notNull(user, "user must not be null");
+
         //签发时间
         Date iatDate = new Date();
         //token过期时间
@@ -107,18 +122,21 @@ public class AuthServiceImpl implements AuthService {
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KEY));
             if (UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType())) {
-                redisTemplate.opsForValue().set(token, user.getId().toString(), 31, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(token, user.getId().toString() + "," + wxId, 31, TimeUnit.DAYS);
             } else {
-                redisTemplate.opsForValue().set(token, user.getId().toString(), 7, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(token, user.getId().toString() + "," + wxId, 7, TimeUnit.DAYS);
+            }
+            //微信小程序专属
+            if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
+                redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
             }
 
         } catch (Exception e) {
             e.printStackTrace();
             log.error(e + ": 令牌生成失败");
-            return ServiceResult.error("令牌生成失败，请重新操作");
+            throw new AuthorizationException("令牌生成失败");
         }
-
-        return ServiceResult.toResult(token);
+        return token;
     }
 
     @Override
@@ -144,30 +162,34 @@ public class AuthServiceImpl implements AuthService {
         if (StringUtils.isEmpty(token)) {
             return false;
         }
-        if (!StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
-            if(UserType.DRIVER.equals(userInfo.getUserType())){
+        String tokenRedis = redisTemplate.opsForValue().get(token);
+        String wxId = tokenRedis.substring(tokenRedis.indexOf(",") + 1);
+        if (!StringUtils.isEmpty(wxId) && !"null".equals(wxId)){
+            log.info("当前用户是微信小程序用户，wxId: " + wxId);
+        }
+        if (!StringUtils.isEmpty(tokenRedis)) {
+            if (UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType())) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.expire(token, 7, TimeUnit.DAYS);
             }
-
+            //微信小程序专属
+            if (UserType.CUSTOMER.equals(userInfo.getUserType()) && !StringUtils.isEmpty(wxId)) {
+                redisTemplate.expire(wxId, 31, TimeUnit.DAYS);
+            }
             return true;
         }
-        log.warn(token + " :该token无效，延期失败！");
+        log.warn(token + " :该token无效，延期失败");
         return false;
     }
 
     @Override
     public boolean verifyToken(String token) {
-        String flg = null;
+        boolean flg = false;
         if (!StringUtils.isEmpty(token)) {
-            flg = redisTemplate.opsForValue().get(token);
+            flg = !StringUtils.isEmpty(redisTemplate.opsForValue().get(token));
         }
-        if (!StringUtils.isEmpty(flg)) {
-            return true;
-        }
-        log.warn(token + ":该token无效。userId: " + flg);
-        return false;
+        return flg;
     }
 
     @Override
