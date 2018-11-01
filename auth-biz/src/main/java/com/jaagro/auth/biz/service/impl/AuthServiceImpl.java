@@ -151,6 +151,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean postpone(String token) {
+        System.out.println(token.length());
         UserInfo userInfo = null;
         //解析token
         try {
