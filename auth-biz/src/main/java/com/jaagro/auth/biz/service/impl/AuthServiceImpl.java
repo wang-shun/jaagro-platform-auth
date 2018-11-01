@@ -160,7 +160,7 @@ public class AuthServiceImpl implements AuthService {
             e.printStackTrace();
         }
         //有部分请求是不需要token的,故过滤掉这部分
-        if (StringUtils.isEmpty(token) || "null".equals(token)) {
+        if (StringUtils.isEmpty(token)) {
             return false;
         }
         String tokenRedis = redisTemplate.opsForValue().get(token);
