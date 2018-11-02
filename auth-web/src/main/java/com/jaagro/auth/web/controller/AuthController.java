@@ -62,7 +62,7 @@ public class AuthController {
      */
     @GetMapping("/getTokenByWxId/{wxId}")
     public BaseResponse getTokenByWxId(@PathVariable("wxId") String wxId) {
-        return BaseResponse.successInstance(authService.getTokenByWxId(wxId));
+        return BaseResponse.successInstance((Object) authService.getTokenByWxId(wxId));
     }
 
     /**
