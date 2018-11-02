@@ -12,11 +12,8 @@ import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.MD5Utils;
-import com.jaagro.utils.ResponseStatusCode;
-import com.jaagro.utils.ServiceResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -87,7 +84,7 @@ public class AuthServiceImpl implements AuthService {
     public String getTokenByWxId(String wxId) {
         String tokenData = redisTemplate.opsForValue().get(wxId);
         if (StringUtils.isEmpty(tokenData)) {
-            throw new NullPointerException("微信id无效");
+            throw new AuthorizationException("微信id无效");
         }
         return tokenData;
     }
