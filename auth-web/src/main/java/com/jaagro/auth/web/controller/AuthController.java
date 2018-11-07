@@ -3,15 +3,21 @@ package com.jaagro.auth.web.controller;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
+import com.jaagro.auth.web.config.HttpClientUtil;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
 import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author tony
  */
+@Slf4j
 @RestController
 public class AuthController {
 
@@ -115,5 +121,26 @@ public class AuthController {
     @PostMapping("getUserById")
     public UserInfo getUserInfoById(@RequestParam("id") Integer id, @RequestParam("userType") String userType) {
         return userClientService.getUserInfo(id, userType, "id");
+    }
+
+    /**
+     * 获取微信id
+     * @param appId
+     * @param secret
+     * @param jsCode
+     * @return
+     */
+    @GetMapping("/getWxCode")
+    public String getWxCode(String appId, String secret, String jsCode){
+        String url = "https://api.weixin.qq.com/sns/jscode2session";
+        Map<String, String> param = new HashMap<>(16);
+        param.put("appid", appId);
+        param.put("secret", secret);
+        param.put("js_code", jsCode);
+        param.put("grant_type", "authorization_code");
+        String result = HttpClientUtil.doGet(url, param);
+        System.out.println(url);
+        log.debug("微信接口返回：" + result);
+        return result;
     }
 }
