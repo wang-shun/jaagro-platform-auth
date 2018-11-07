@@ -139,7 +139,6 @@ public class AuthController {
         param.put("js_code", jsCode);
         param.put("grant_type", "authorization_code");
         String result = HttpClientUtil.doGet(url, param);
-        System.out.println(url);
         log.debug("微信接口返回：" + result);
         return result;
     }
