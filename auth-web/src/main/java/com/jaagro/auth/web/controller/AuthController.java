@@ -4,11 +4,14 @@ import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.auth.web.config.HttpClientUtil;
+import com.jaagro.auth.web.vo.LoginParamVo;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
+import com.jaagro.utils.ResponseStatusCode;
 import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -31,16 +34,16 @@ public class AuthController {
     /**
      * 通过用户名密码获取token
      *
-     * @param username
-     * @param password
+     * @param param
      * @return
      */
     @PostMapping("/token")
-    public BaseResponse getTokenByPassword(@RequestParam("username") String username,
-                                           @RequestParam("password") String password,
-                                           @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType) {
+    public BaseResponse getTokenByPassword(@RequestBody LoginParamVo param) {
 
-        String token = authService.createTokenByPassword(username, password, userType);
+        if(StringUtils.isEmpty(param.getUsername()) || StringUtils.isEmpty(param.getPassword()) || StringUtils.isEmpty(param.getUserType())){
+            return BaseResponse.errorInstance(ResponseStatusCode.QUERY_DATA_ERROR.getCode(), "缺少参数");
+        }
+        String token = authService.createTokenByPassword(param.getUsername(), param.getPassword(), param.getUserType());
         return BaseResponse.successInstance((Object) token);
     }
 
@@ -125,13 +128,14 @@ public class AuthController {
 
     /**
      * 获取微信id
+     *
      * @param appId
      * @param secret
      * @param jsCode
      * @return
      */
     @GetMapping("/getWxCode")
-    public String getWxCode(String appId, String secret, String jsCode){
+    public String getWxCode(String appId, String secret, String jsCode) {
         String url = "https://api.weixin.qq.com/sns/jscode2session";
         Map<String, String> param = new HashMap<>(16);
         param.put("appid", appId);
