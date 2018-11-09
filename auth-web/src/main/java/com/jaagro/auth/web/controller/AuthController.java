@@ -40,7 +40,7 @@ public class AuthController {
     @PostMapping("/token")
     public BaseResponse getTokenByPassword(@RequestBody LoginParamVo param) {
 
-        if(StringUtils.isEmpty(param.getUsername()) || StringUtils.isEmpty(param.getPassword()) || StringUtils.isEmpty(param.getUserType())){
+        if (StringUtils.isEmpty(param.getUsername()) || StringUtils.isEmpty(param.getPassword()) || StringUtils.isEmpty(param.getUserType())) {
             return BaseResponse.errorInstance(ResponseStatusCode.QUERY_DATA_ERROR.getCode(), "缺少参数");
         }
         String token = authService.createTokenByPassword(param.getUsername(), param.getPassword(), param.getUserType());
