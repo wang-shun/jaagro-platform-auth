@@ -1,22 +1,26 @@
 package com.jaagro.auth.web.controller;
 
 import com.jaagro.auth.api.service.AuthService;
-import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.auth.api.service.UserClientService;
+import com.jaagro.auth.api.service.VerificationCodeClientService;
+import com.jaagro.auth.web.config.HttpClientUtil;
+import com.jaagro.auth.web.vo.LoginParamVo;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
-import io.swagger.annotations.*;
+import com.jaagro.utils.ResponseStatusCode;
+import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
  * @author tony
  */
+@Slf4j
 @RestController
 public class AuthController {
 
@@ -30,17 +34,17 @@ public class AuthController {
     /**
      * 通过用户名密码获取token
      *
-     * @param username
-     * @param password
+     * @param param
      * @return
      */
     @PostMapping("/token")
-    public BaseResponse getTokenByPassword(@RequestParam("username") String username,
-                                           @RequestParam("password") String password,
-                                           @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType) {
+    public BaseResponse getTokenByPassword(@RequestBody LoginParamVo param) {
 
-        Map<String, Object> map = authService.createTokenByPassword(username, password, userType);
-        return BaseResponse.service(map);
+        if (StringUtils.isEmpty(param.getUsername()) || StringUtils.isEmpty(param.getPassword()) || StringUtils.isEmpty(param.getUserType())) {
+            return BaseResponse.errorInstance(ResponseStatusCode.QUERY_DATA_ERROR.getCode(), "缺少参数");
+        }
+        String token = authService.createTokenByPassword(param.getUsername(), param.getPassword(), param.getUserType());
+        return BaseResponse.successInstance((Object) token);
     }
 
     /**
@@ -53,10 +57,21 @@ public class AuthController {
     @GetMapping("/token")
     public BaseResponse getTokenByPhone(@RequestParam("phoneNumber") String phoneNumber,
                                         @RequestParam("verificationCode") String verificationCode,
-                                        @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType) {
+                                        @RequestParam("userType") @ApiParam(value = "共三个类型：customer、employee、driver", required = true) String userType,
+                                        @RequestParam(value = "wxId", required = false) String wxId) {
+        String token = authService.createTokenByPhone(phoneNumber, verificationCode, userType, wxId);
+        return BaseResponse.successInstance((Object) token);
+    }
 
-        Map<String, Object> map = authService.createTokenByPhone(phoneNumber, verificationCode, userType);
-        return BaseResponse.service(map);
+    /**
+     * 通过wxId获取token
+     *
+     * @param wxId
+     * @return
+     */
+    @GetMapping("/getTokenByWxId/{wxId}")
+    public BaseResponse getTokenByWxId(@PathVariable("wxId") String wxId) {
+        return BaseResponse.successInstance((Object) authService.getTokenByWxId(wxId));
     }
 
     /**
@@ -78,6 +93,7 @@ public class AuthController {
      */
     @PostMapping("/getUserByToken")
     public UserInfo getUserByToken(String token) {
+
         UserInfo userInfo = null;
         try {
             userInfo = authService.getUserByToken(token);
@@ -88,12 +104,13 @@ public class AuthController {
     }
 
     /**
-     * 延期token，用户每次请求api 都将调用此方法延长token在redis中的有效期（3天）
+     * 延期token，用户每次请求api 都将调用此方法延长token在redis中的有效期
+     *
      * @param token
      * @return
      */
     @PostMapping("/postponeToken")
-    public boolean postponeToken(String token) {
+    public boolean postponeToken(@RequestParam("token") String token) {
         return authService.postpone(token);
     }
 
@@ -107,5 +124,26 @@ public class AuthController {
     @PostMapping("getUserById")
     public UserInfo getUserInfoById(@RequestParam("id") Integer id, @RequestParam("userType") String userType) {
         return userClientService.getUserInfo(id, userType, "id");
+    }
+
+    /**
+     * 获取微信id
+     *
+     * @param appId
+     * @param secret
+     * @param jsCode
+     * @return
+     */
+    @GetMapping("/getWxCode")
+    public String getWxCode(String appId, String secret, String jsCode) {
+        String url = "https://api.weixin.qq.com/sns/jscode2session";
+        Map<String, String> param = new HashMap<>(16);
+        param.put("appid", appId);
+        param.put("secret", secret);
+        param.put("js_code", jsCode);
+        param.put("grant_type", "authorization_code");
+        String result = HttpClientUtil.doGet(url, param);
+        log.debug("微信接口返回：" + result);
+        return result;
     }
 }
