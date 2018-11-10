@@ -119,16 +119,15 @@ public class AuthServiceImpl implements AuthService {
                     .withIssuedAt(iatDate)
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KEY));
-            //微信小程序专属
-            if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
-                log.debug("微信openId: " + wxId);
-                redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
-                return token;
-            }
             if (UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType())) {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 7, TimeUnit.DAYS);
+            }
+            //微信小程序专属
+            if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
+                log.debug("微信openId: " + wxId);
+                redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
             }
         } catch (Exception e) {
             e.printStackTrace();
