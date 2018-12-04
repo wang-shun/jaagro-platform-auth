@@ -20,7 +20,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -60,11 +59,11 @@ public class AuthServiceImpl implements AuthService {
         //判断user是否有效
         UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
         if (user == null) {
-            throw new AuthorizationException(username + " :用户名不存在");
+            throw new AuthorizationException(username + " :user name does not exist");
         }
         String encodePassword = MD5Utils.encode(password, user.getSalt());
         if (!encodePassword.equals(user.getPassword())) {
-            throw new AuthorizationException("用户名或密码错误");
+            throw new AuthorizationException("error username or password");
         }
         return createToken(user, null);
     }
@@ -73,10 +72,10 @@ public class AuthServiceImpl implements AuthService {
     public String createTokenByPhone(String phoneNumber, String verificationCode, String userType, String wxId) {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
         if (user == null) {
-            throw new AuthorizationException("手机号码未注册");
+            throw new AuthorizationException("the phone number not registered");
         }
         if (!verificationCodeClientService.existMessage(phoneNumber, verificationCode)) {
-            throw new AuthorizationException("验证码不正确");
+            throw new AuthorizationException("error verification code");
         }
         return createToken(user, wxId);
     }
@@ -85,7 +84,7 @@ public class AuthServiceImpl implements AuthService {
     public String getTokenByWxId(String wxId) {
         String tokenData = redisTemplate.opsForValue().get(wxId);
         if (StringUtils.isEmpty(tokenData)) {
-            throw new AuthorizationException("微信id无效");
+            throw new AuthorizationException("weixin id must not be null");
         }
         return tokenData;
     }
@@ -126,13 +125,12 @@ public class AuthServiceImpl implements AuthService {
             }
             //微信小程序专属
             if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
-                log.debug("微信openId: " + wxId);
+                log.debug("O createToken weixin openId : " + wxId);
                 redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
             }
         } catch (Exception e) {
             e.printStackTrace();
-            log.error(e + ": 令牌生成失败");
-            throw new AuthorizationException("令牌生成失败");
+            throw new AuthorizationException("token creation failed");
         }
         return token;
     }
@@ -163,9 +161,6 @@ public class AuthServiceImpl implements AuthService {
         }
         String tokenRedis = redisTemplate.opsForValue().get(token);
         String wxId = tokenRedis.substring(tokenRedis.indexOf(",") + 1);
-        if (!StringUtils.isEmpty(wxId)) {
-            log.info("当前用户是微信小程序用户，wxId: " + wxId);
-        }
         if (!StringUtils.isEmpty(tokenRedis)) {
             if (UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType())) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
@@ -178,7 +173,7 @@ public class AuthServiceImpl implements AuthService {
             }
             return true;
         }
-        log.warn(token + " :该token无效，延期失败");
+        log.warn("O postpone token postpone failed: {}", token);
         return false;
     }
 
@@ -194,7 +189,6 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public UserInfo getUserByToken(String token) throws Exception {
         if (StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
-            log.warn(token + ": token无效");
             return null;
         }
         JWTVerifier verifier = JWT.require(Algorithm.HMAC256(SECRET_KEY)).build();
@@ -202,8 +196,7 @@ public class AuthServiceImpl implements AuthService {
         try {
             jwt = verifier.verify(token);
         } catch (Exception e) {
-            e.printStackTrace();
-            log.warn(e + ": token解析出错");
+            log.warn("O getUserByToken error token: {}, ex: {}", token, e);
             return null;
         }
         String userIdStr = jwt.getClaim("user").asString();
