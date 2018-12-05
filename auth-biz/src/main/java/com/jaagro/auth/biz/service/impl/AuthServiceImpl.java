@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -142,11 +143,10 @@ public class AuthServiceImpl implements AuthService {
             }
             //微信小程序专属
             if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
-                log.debug("O createToken weixin openId : " + wxId);
+                log.debug("O createToken: current weiXin openId : {}", wxId);
                 redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
             }
         } catch (Exception e) {
-            e.printStackTrace();
             throw new AuthorizationException("token creation failed");
         }
         return token;
@@ -164,22 +164,18 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean postpone(String token) {
-        System.out.println(token.length());
-        UserInfo userInfo = null;
-        //解析token
-        try {
-            userInfo = this.getUserByToken(token);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        UserInfo userInfo = this.getUserByToken(token);
         //有部分请求是不需要token的,故过滤掉这部分
         if (StringUtils.isEmpty(token)) {
             return false;
         }
         String tokenRedis = redisTemplate.opsForValue().get(token);
         String wxId = tokenRedis.substring(tokenRedis.indexOf(",") + 1);
-        if (!StringUtils.isEmpty(tokenRedis)) {
-            if (UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType())) {
+        if (!StringUtils.isEmpty(tokenRedis) && null != userInfo) {
+            boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) ||
+                    UserType.VISITOR_DRIVER.equals(userInfo.getUserType()) ||
+                    UserType.CUSTOMER.equals(userInfo.getUserType());
+            if (flg) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.expire(token, 7, TimeUnit.DAYS);
@@ -190,7 +186,7 @@ public class AuthServiceImpl implements AuthService {
             }
             return true;
         }
-        log.warn("O postpone token postpone failed: {}", token);
+        log.warn("O postpone: token postpone failed: {}", token);
         return false;
     }
 
@@ -204,28 +200,39 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public UserInfo getUserByToken(String token) throws Exception {
+    public UserInfo getUserByToken(String token) {
         if (StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
+            log.info("O getUserByToken: Token does not exist：{}", token);
             return null;
         }
-        JWTVerifier verifier = JWT.require(Algorithm.HMAC256(SECRET_KEY)).build();
-        DecodedJWT jwt;
+        JWTVerifier verifier;
         try {
-            jwt = verifier.verify(token);
-        } catch (Exception e) {
-            log.warn("O getUserByToken error token: {}, ex: {}", token, e);
+            verifier = JWT.require(Algorithm.HMAC256(SECRET_KEY)).build();
+        } catch (UnsupportedEncodingException e) {
+            log.error("R getUserByToken: {}", e);
             return null;
         }
+        DecodedJWT jwt;
+        jwt = verifier.verify(token);
+
         String userIdStr = jwt.getClaim("user").asString();
         String userType = jwt.getClaim("userType").asString();
         //需要查出user对象封装并返回
         UserInfo userInfo = new UserInfo();
-        //通过user来判断token是否有效
         if (!StringUtils.isEmpty(userIdStr)) {
             Integer userId = Integer.valueOf(userIdStr);
-            userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
+            //游客身份的司机
+            if (UserType.VISITOR_DRIVER.equals(userType)) {
+                SocialDriverRegisterPurposeDto sdr = crmClientService.getSocialDriverRegisterPurposeDtoById(userId).getData();
+                userInfo.setId(sdr.getId());
+                userInfo.setUserType(userType);
+                userInfo.setPhoneNumber(sdr.getPhoneNumber());
+                userInfo.setName(sdr.getName());
+                log.info("O getUserByToken: The current driver is a visitor：{}", userInfo);
+            } else {
+                userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
+            }
         }
         return userInfo;
     }
-
 }
