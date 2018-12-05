@@ -6,8 +6,10 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jaagro.auth.api.constant.LoginType;
 import com.jaagro.auth.api.constant.UserType;
+import com.jaagro.auth.api.dto.SocialDriverRegisterPurposeDto;
 import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
+import com.jaagro.auth.api.service.CrmClientService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.constant.UserInfo;
@@ -42,6 +44,8 @@ public class AuthServiceImpl implements AuthService {
     private VerificationCodeClientService verificationCodeClientService;
     @Autowired
     private StringRedisTemplate redisTemplate;
+    @Autowired
+    private CrmClientService crmClientService;
 
     /**
      * 秘钥
@@ -55,10 +59,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String createTokenByPassword(String username, String password, String userType) {
-
         //判断user是否有效
         UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
-        if (user == null) {
+        if (null == user) {
             throw new AuthorizationException(username + " :user name does not exist");
         }
         String encodePassword = MD5Utils.encode(password, user.getSalt());
@@ -71,8 +74,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String createTokenByPhone(String phoneNumber, String verificationCode, String userType, String wxId) {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
-        if (user == null) {
-            throw new AuthorizationException("the phone number not registered");
+        //游客司机
+        if (null == user && UserType.DRIVER.equals(userType)) {
+            SocialDriverRegisterPurposeDto sdr = crmClientService.getByPhoneNumber(phoneNumber).getData();
+            if (null != sdr) {
+                user = new UserInfo();
+                user.setName(sdr.getName());
+                user.setId(sdr.getId());
+                user.setPhoneNumber(sdr.getPhoneNumber());
+                user.setUserType(UserType.VISITOR_DRIVER);
+            }
+        }
+        if (null == user) {
+            throw new AuthorizationException("the phone not registered");
         }
         if (!verificationCodeClientService.existMessage(phoneNumber, verificationCode)) {
             throw new AuthorizationException("error verification code");
@@ -84,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
     public String getTokenByWxId(String wxId) {
         String tokenData = redisTemplate.opsForValue().get(wxId);
         if (StringUtils.isEmpty(tokenData)) {
-            throw new AuthorizationException("weixin id must not be null");
+            throw new AuthorizationException("weiXin id must not be null");
         }
         return tokenData;
     }
@@ -118,7 +132,10 @@ public class AuthServiceImpl implements AuthService {
                     .withIssuedAt(iatDate)
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KEY));
-            if (UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType())) {
+            boolean flg = UserType.DRIVER.equals(user.getUserType()) ||
+                    UserType.CUSTOMER.equals(user.getUserType()) ||
+                    UserType.VISITOR_DRIVER.equals(user.getUserType());
+            if (flg) {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 7, TimeUnit.DAYS);
