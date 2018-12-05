@@ -63,11 +63,11 @@ public class AuthServiceImpl implements AuthService {
         //判断user是否有效
         UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
         if (null == user) {
-            throw new AuthorizationException(username + " :user name does not exist");
+            throw new AuthorizationException(username + " :用户不存在");
         }
         String encodePassword = MD5Utils.encode(password, user.getSalt());
         if (!encodePassword.equals(user.getPassword())) {
-            throw new AuthorizationException("error username or password");
+            throw new AuthorizationException("用户名或密码不正确");
         }
         return createToken(user, null);
     }
@@ -75,22 +75,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String createTokenByPhone(String phoneNumber, String verificationCode, String userType, String wxId) {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
-        //游客司机
-        if (null == user && UserType.DRIVER.equals(userType)) {
-            SocialDriverRegisterPurposeDto sdr = crmClientService.getByPhoneNumber(phoneNumber).getData();
-            if (null != sdr) {
-                user = new UserInfo();
-                user.setName(sdr.getName());
-                user.setId(sdr.getId());
-                user.setPhoneNumber(sdr.getPhoneNumber());
-                user.setUserType(UserType.VISITOR_DRIVER);
-            }
-        }
         if (null == user) {
-            throw new AuthorizationException("the phone not registered");
+            throw new AuthorizationException(phoneNumber + ": 当前手机号未注册");
         }
         if (!verificationCodeClientService.existMessage(phoneNumber, verificationCode)) {
-            throw new AuthorizationException("error verification code");
+            throw new AuthorizationException("验证码不正确");
         }
         return createToken(user, wxId);
     }
@@ -133,9 +122,7 @@ public class AuthServiceImpl implements AuthService {
                     .withIssuedAt(iatDate)
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KEY));
-            boolean flg = UserType.DRIVER.equals(user.getUserType()) ||
-                    UserType.CUSTOMER.equals(user.getUserType()) ||
-                    UserType.VISITOR_DRIVER.equals(user.getUserType());
+            boolean flg = UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType());
             if (flg) {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 31, TimeUnit.DAYS);
             } else {
@@ -164,17 +151,15 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean postpone(String token) {
-        UserInfo userInfo = this.getUserByToken(token);
         //有部分请求是不需要token的,故过滤掉这部分
         if (StringUtils.isEmpty(token)) {
             return false;
         }
+        UserInfo userInfo = this.getUserByToken(token);
         String tokenRedis = redisTemplate.opsForValue().get(token);
         String wxId = tokenRedis.substring(tokenRedis.indexOf(",") + 1);
         if (!StringUtils.isEmpty(tokenRedis) && null != userInfo) {
-            boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) ||
-                    UserType.VISITOR_DRIVER.equals(userInfo.getUserType()) ||
-                    UserType.CUSTOMER.equals(userInfo.getUserType());
+            boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType());
             if (flg) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
             } else {
@@ -214,24 +199,13 @@ public class AuthServiceImpl implements AuthService {
         }
         DecodedJWT jwt;
         jwt = verifier.verify(token);
-
         String userIdStr = jwt.getClaim("user").asString();
         String userType = jwt.getClaim("userType").asString();
         //需要查出user对象封装并返回
         UserInfo userInfo = new UserInfo();
         if (!StringUtils.isEmpty(userIdStr)) {
             Integer userId = Integer.valueOf(userIdStr);
-            //游客身份的司机
-            if (UserType.VISITOR_DRIVER.equals(userType)) {
-                SocialDriverRegisterPurposeDto sdr = crmClientService.getSocialDriverRegisterPurposeDtoById(userId).getData();
-                userInfo.setId(sdr.getId());
-                userInfo.setUserType(userType);
-                userInfo.setPhoneNumber(sdr.getPhoneNumber());
-                userInfo.setName(sdr.getName());
-                log.info("O getUserByToken: The current driver is a visitor：{}", userInfo);
-            } else {
-                userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
-            }
+            userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
         }
         return userInfo;
     }
