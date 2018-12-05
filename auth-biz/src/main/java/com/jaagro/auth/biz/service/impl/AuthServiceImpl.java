@@ -209,7 +209,7 @@ public class AuthServiceImpl implements AuthService {
         try {
             verifier = JWT.require(Algorithm.HMAC256(SECRET_KEY)).build();
         } catch (UnsupportedEncodingException e) {
-            log.error("R getUserByToken: {}", e);
+            log.error("R getUserByToken: ", e);
             return null;
         }
         DecodedJWT jwt;
