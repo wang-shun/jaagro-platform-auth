@@ -202,7 +202,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public UserInfo getUserByToken(String token) {
         if (StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
-            log.info("O getUserByToken: Token does not exist：{}", token);
+            log.info("O getUserByToken: Token does not exist: {}", token);
             return null;
         }
         JWTVerifier verifier;
