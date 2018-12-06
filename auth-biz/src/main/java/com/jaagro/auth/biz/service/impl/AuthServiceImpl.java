@@ -142,7 +142,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void invalidate(String token) {
-
+        String tokenValue = redisTemplate.opsForValue().get(token);
+        String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
+        redisTemplate.delete(token);
+        redisTemplate.delete(wxId);
     }
 
     @Override
@@ -157,9 +160,9 @@ public class AuthServiceImpl implements AuthService {
             return false;
         }
         UserInfo userInfo = this.getUserByToken(token);
-        String tokenRedis = redisTemplate.opsForValue().get(token);
-        String wxId = tokenRedis.substring(tokenRedis.indexOf(",") + 1);
-        if (!StringUtils.isEmpty(tokenRedis) && null != userInfo) {
+        String tokenValue = redisTemplate.opsForValue().get(token);
+        String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
+        if (!StringUtils.isEmpty(tokenValue) && null != userInfo) {
             boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType());
             if (flg) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
