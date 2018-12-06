@@ -155,12 +155,12 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean postpone(String token) {
-        //有部分请求是不需要token的,故过滤掉这部分
-        if (StringUtils.isEmpty(token)) {
+        String tokenValue = redisTemplate.opsForValue().get(token);
+        //有部分请求是不需要token或传入一个无效token，故过滤掉这部分
+        if (StringUtils.isEmpty(token)|| StringUtils.isEmpty(tokenValue)) {
             return false;
         }
         UserInfo userInfo = this.getUserByToken(token);
-        String tokenValue = redisTemplate.opsForValue().get(token);
         String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
         if (!StringUtils.isEmpty(tokenValue) && null != userInfo) {
             boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType());
