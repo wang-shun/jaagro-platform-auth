@@ -6,7 +6,6 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jaagro.auth.api.constant.LoginType;
 import com.jaagro.auth.api.constant.UserType;
-import com.jaagro.auth.api.dto.SocialDriverRegisterPurposeDto;
 import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
 import com.jaagro.auth.api.service.CrmClientService;
@@ -30,7 +29,9 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 提供给feign调用，主要用于gateway层获取和验证token
+ * 授权中心核心代码，提供token的生成、验证、延时、解析功能
+ * token生成组件使用的是auth0提供的开源组件
+ * token的格式为JWT，此授权中心只使用auto0生成JWT格式的token，token持久化到rides，验证也是匹配redis中是否存在而非标准的JWT验证token规则
  *
  * @author tony
  */
@@ -76,7 +77,7 @@ public class AuthServiceImpl implements AuthService {
     public String createTokenByPhone(String phoneNumber, String verificationCode, String userType, String wxId) {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
         if (null == user) {
-            throw new AuthorizationException(phoneNumber + ": 当前手机号未注册");
+            throw new AuthorizationException(phoneNumber + ": 手机号未注册");
         }
         if (!verificationCodeClientService.existMessage(phoneNumber, verificationCode)) {
             throw new AuthorizationException("验证码不正确");
@@ -128,7 +129,7 @@ public class AuthServiceImpl implements AuthService {
             } else {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 7, TimeUnit.DAYS);
             }
-            //微信小程序专属
+            //微信小程序多插入一条以wxId为Key的记录
             if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
                 log.debug("O createToken: current weiXin openId : {}", wxId);
                 redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
