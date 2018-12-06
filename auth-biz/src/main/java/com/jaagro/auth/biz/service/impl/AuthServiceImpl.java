@@ -140,6 +140,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void invalidate(String token) {
         String tokenValue = redisTemplate.opsForValue().get(token);
+        if(StringUtils.isEmpty(tokenValue)){
+            throw new NullPointerException("Token does not exist");
+        }
         String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
         redisTemplate.delete(token);
         redisTemplate.delete(wxId);
