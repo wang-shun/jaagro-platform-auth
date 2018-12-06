@@ -146,4 +146,10 @@ public class AuthController {
         log.debug("微信接口返回：" + result);
         return result;
     }
+
+    @GetMapping("/invalidateToken/{token}")
+    public BaseResponse invalidateToken(@PathVariable("token") String token){
+        authService.invalidate(token);
+        return BaseResponse.successInstance("退出登录");
+    }
 }
