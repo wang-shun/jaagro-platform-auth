@@ -147,8 +147,8 @@ public class AuthController {
         return result;
     }
 
-    @GetMapping("/invalidateToken/{token}")
-    public BaseResponse invalidateToken(@PathVariable("token") String token){
+    @GetMapping("/invalidateToken")
+    public BaseResponse invalidateToken(@RequestParam("token") String token){
         authService.invalidate(token);
         return BaseResponse.successInstance("退出登录");
     }
