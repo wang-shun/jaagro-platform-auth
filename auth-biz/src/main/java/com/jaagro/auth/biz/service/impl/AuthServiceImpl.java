@@ -8,7 +8,6 @@ import com.jaagro.auth.api.constant.LoginType;
 import com.jaagro.auth.api.constant.UserType;
 import com.jaagro.auth.api.exception.AuthorizationException;
 import com.jaagro.auth.api.service.AuthService;
-import com.jaagro.auth.api.service.CrmClientService;
 import com.jaagro.auth.api.service.UserClientService;
 import com.jaagro.auth.api.service.VerificationCodeClientService;
 import com.jaagro.constant.UserInfo;
@@ -46,8 +45,6 @@ public class AuthServiceImpl implements AuthService {
     private VerificationCodeClientService verificationCodeClientService;
     @Autowired
     private StringRedisTemplate redisTemplate;
-    @Autowired
-    private CrmClientService crmClientService;
 
     /**
      * 秘钥
