@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * @author tony
  */
 @ControllerAdvice
-public class AdminExceptionHandler {
-    private static final Logger log = LoggerFactory.getLogger(AdminExceptionHandler.class);
+public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ResponseBody
     @ExceptionHandler(value = Exception.class)

@@ -20,15 +20,17 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
 
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 提供给feign调用，主要用于gateway层获取和验证token
+ * 授权中心核心代码，提供token的生成、验证、延时、解析功能
+ * token生成组件使用的是auth0提供的开源组件
+ * token的格式为JWT，此授权中心只使用auto0生成JWT格式的token，token持久化到rides，验证也是匹配redis中是否存在而非标准的JWT验证token规则
  *
  * @author tony
  */
@@ -56,15 +58,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String createTokenByPassword(String username, String password, String userType) {
-
         //判断user是否有效
         UserInfo user = userClientService.getUserInfo(username, userType, LoginType.LOGIN_NAME);
-        if (user == null) {
-            throw new AuthorizationException(username + " :用户名不存在");
+        if (null == user) {
+            throw new AuthorizationException(username + " :用户不存在");
         }
         String encodePassword = MD5Utils.encode(password, user.getSalt());
         if (!encodePassword.equals(user.getPassword())) {
-            throw new AuthorizationException("用户名或密码错误");
+            throw new AuthorizationException("用户名或密码不正确");
         }
         return createToken(user, null);
     }
@@ -72,8 +73,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String createTokenByPhone(String phoneNumber, String verificationCode, String userType, String wxId) {
         UserInfo user = userClientService.getUserInfo(phoneNumber, userType, LoginType.PHONE_NUMBER);
-        if (user == null) {
-            throw new AuthorizationException("手机号码未注册");
+        if (null == user) {
+            throw new AuthorizationException(phoneNumber + ": 手机号未注册");
         }
         if (!verificationCodeClientService.existMessage(phoneNumber, verificationCode)) {
             throw new AuthorizationException("验证码不正确");
@@ -85,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
     public String getTokenByWxId(String wxId) {
         String tokenData = redisTemplate.opsForValue().get(wxId);
         if (StringUtils.isEmpty(tokenData)) {
-            throw new AuthorizationException("微信id无效");
+            throw new AuthorizationException("weiXin id must not be null");
         }
         return tokenData;
     }
@@ -119,27 +120,32 @@ public class AuthServiceImpl implements AuthService {
                     .withIssuedAt(iatDate)
                     //加密
                     .sign(Algorithm.HMAC256(SECRET_KEY));
-            if (UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType())) {
+            boolean flg = UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType());
+            if (flg) {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 7, TimeUnit.DAYS);
             }
-            //微信小程序专属
+            //微信小程序多插入一条以wxId为Key的记录
             if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
+                log.debug("O createToken: current weiXin openId : {}", wxId);
                 redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
             }
-
         } catch (Exception e) {
-            e.printStackTrace();
-            log.error(e + ": 令牌生成失败");
-            throw new AuthorizationException("令牌生成失败");
+            throw new AuthorizationException("token creation failed");
         }
         return token;
     }
 
     @Override
     public void invalidate(String token) {
-
+        String tokenValue = redisTemplate.opsForValue().get(token);
+        if (StringUtils.isEmpty(tokenValue)) {
+            throw new NullPointerException("Token does not exist");
+        }
+        String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
+        redisTemplate.delete(token);
+        redisTemplate.delete(wxId);
     }
 
     @Override
@@ -149,25 +155,16 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean postpone(String token) {
-        System.out.println(token.length());
-        UserInfo userInfo = null;
-        //解析token
-        try {
-            userInfo = this.getUserByToken(token);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        //有部分请求是不需要token的,故过滤掉这部分
-        if (StringUtils.isEmpty(token)) {
+        String tokenValue = redisTemplate.opsForValue().get(token);
+        //有部分请求是不需要token或传入一个无效token，故过滤掉这部分
+        if (StringUtils.isEmpty(token) || StringUtils.isEmpty(tokenValue)) {
             return false;
         }
-        String tokenRedis = redisTemplate.opsForValue().get(token);
-        String wxId = tokenRedis.substring(tokenRedis.indexOf(",") + 1);
-        if (!StringUtils.isEmpty(wxId)) {
-            log.info("当前用户是微信小程序用户，wxId: " + wxId);
-        }
-        if (!StringUtils.isEmpty(tokenRedis)) {
-            if (UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType())) {
+        UserInfo userInfo = this.getUserByToken(token);
+        String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
+        if (!StringUtils.isEmpty(tokenValue) && null != userInfo) {
+            boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType());
+            if (flg) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.expire(token, 7, TimeUnit.DAYS);
@@ -178,7 +175,7 @@ public class AuthServiceImpl implements AuthService {
             }
             return true;
         }
-        log.warn(token + " :该token无效，延期失败");
+        log.warn("O postpone: token postpone failed: {}", token);
         return false;
     }
 
@@ -192,30 +189,28 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public UserInfo getUserByToken(String token) throws Exception {
+    public UserInfo getUserByToken(String token) {
         if (StringUtils.isEmpty(redisTemplate.opsForValue().get(token))) {
-            log.warn(token + ": token无效");
+            log.info("O getUserByToken: Token does not exist: {}", token);
             return null;
         }
-        JWTVerifier verifier = JWT.require(Algorithm.HMAC256(SECRET_KEY)).build();
-        DecodedJWT jwt;
+        JWTVerifier verifier;
         try {
-            jwt = verifier.verify(token);
-        } catch (Exception e) {
-            e.printStackTrace();
-            log.warn(e + ": token解析出错");
+            verifier = JWT.require(Algorithm.HMAC256(SECRET_KEY)).build();
+        } catch (UnsupportedEncodingException e) {
+            log.error("R getUserByToken: ", e);
             return null;
         }
+        DecodedJWT jwt;
+        jwt = verifier.verify(token);
         String userIdStr = jwt.getClaim("user").asString();
         String userType = jwt.getClaim("userType").asString();
         //需要查出user对象封装并返回
         UserInfo userInfo = new UserInfo();
-        //通过user来判断token是否有效
         if (!StringUtils.isEmpty(userIdStr)) {
             Integer userId = Integer.valueOf(userIdStr);
             userInfo = userClientService.getUserInfo(userId, userType, LoginType.ID);
         }
         return userInfo;
     }
-
 }
