@@ -140,7 +140,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void invalidate(String token) {
         String tokenValue = redisTemplate.opsForValue().get(token);
-        if(StringUtils.isEmpty(tokenValue)){
+        if (StringUtils.isEmpty(tokenValue)) {
             throw new NullPointerException("Token does not exist");
         }
         String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
@@ -157,7 +157,7 @@ public class AuthServiceImpl implements AuthService {
     public boolean postpone(String token) {
         String tokenValue = redisTemplate.opsForValue().get(token);
         //有部分请求是不需要token或传入一个无效token，故过滤掉这部分
-        if (StringUtils.isEmpty(token)|| StringUtils.isEmpty(tokenValue)) {
+        if (StringUtils.isEmpty(token) || StringUtils.isEmpty(tokenValue)) {
             return false;
         }
         UserInfo userInfo = this.getUserByToken(token);
