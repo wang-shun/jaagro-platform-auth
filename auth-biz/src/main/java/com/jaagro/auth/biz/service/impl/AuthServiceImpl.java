@@ -147,8 +147,15 @@ public class AuthServiceImpl implements AuthService {
             throw new NullPointerException("Token does not exist");
         }
         String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
-        redisTemplate.delete(token);
-        redisTemplate.delete(wxId);
+        if(StringUtils.isEmpty(token)){
+            redisTemplate.delete(token);
+        }
+        if(StringUtils.isEmpty(wxId)){
+            redisTemplate.delete(wxId);
+        }
+        if(StringUtils.isEmpty(userId)) {
+            redisTemplate.delete(userId);
+        }
     }
 
     @Override
