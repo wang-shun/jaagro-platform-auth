@@ -8,6 +8,7 @@ import com.jaagro.auth.web.vo.LoginParamVo;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
 import com.jaagro.utils.ResponseStatusCode;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -148,8 +149,8 @@ public class AuthController {
     }
 
     @GetMapping("/invalidateToken")
-    public BaseResponse invalidateToken(@RequestParam("token") String token){
-        authService.invalidate(token);
+    public BaseResponse invalidateToken(String token, String userId){
+        authService.invalidate(token, userId);
         return BaseResponse.successInstance("退出登录");
     }
 }
