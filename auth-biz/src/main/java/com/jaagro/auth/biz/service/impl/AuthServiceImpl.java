@@ -22,6 +22,7 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
+import java.sql.Time;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -123,8 +124,10 @@ public class AuthServiceImpl implements AuthService {
             boolean flg = UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType());
             if (flg) {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 31, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(user.getId().toString(), token, 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 7, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(user.getId().toString(), token, 7, TimeUnit.DAYS);
             }
             //微信小程序多插入一条以wxId为Key的记录
             if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
@@ -138,7 +141,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void invalidate(String token) {
+    public void invalidate(String token, String userId) {
         String tokenValue = redisTemplate.opsForValue().get(token);
         if (StringUtils.isEmpty(tokenValue)) {
             throw new NullPointerException("Token does not exist");
@@ -166,8 +169,10 @@ public class AuthServiceImpl implements AuthService {
             boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType());
             if (flg) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
+                redisTemplate.expire(userInfo.getId().toString(), 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.expire(token, 7, TimeUnit.DAYS);
+                redisTemplate.expire(userInfo.getId().toString(), 7, TimeUnit.DAYS);
             }
             //微信小程序专属
             if (UserType.CUSTOMER.equals(userInfo.getUserType()) && !StringUtils.isEmpty(wxId)) {
