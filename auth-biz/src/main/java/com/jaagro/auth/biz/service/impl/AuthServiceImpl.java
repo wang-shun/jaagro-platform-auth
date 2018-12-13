@@ -142,20 +142,28 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void invalidate(String token, String userId) {
+        if (StringUtils.isEmpty(token) && StringUtils.isEmpty(userId)) {
+            throw new NullPointerException("token or userId cannot all be empty");
+        }
+        if (StringUtils.isEmpty(token) && !StringUtils.isEmpty(userId)) {
+            token = redisTemplate.opsForValue().get(userId);
+            if(StringUtils.isEmpty(token)){
+                throw new NullPointerException(userId + " :userId not logged in");
+            }
+        }
         String tokenValue = redisTemplate.opsForValue().get(token);
-        if (StringUtils.isEmpty(tokenValue)) {
-            throw new NullPointerException("Token does not exist");
+        String[] vs = tokenValue.split(",");
+        if(StringUtils.isEmpty(userId)){
+            userId = vs[0];
         }
-        String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
-        if(StringUtils.isEmpty(token)){
-            redisTemplate.delete(token);
+        //vs的长度如果大于1说明token中存在wxId
+        String wxId = "";
+        if (vs.length > 1) {
+            wxId = vs[1];
         }
-        if(StringUtils.isEmpty(wxId)){
-            redisTemplate.delete(wxId);
-        }
-        if(StringUtils.isEmpty(userId)) {
-            redisTemplate.delete(userId);
-        }
+        redisTemplate.delete(token);
+        redisTemplate.delete(wxId);
+        redisTemplate.delete(userId);
     }
 
     @Override
