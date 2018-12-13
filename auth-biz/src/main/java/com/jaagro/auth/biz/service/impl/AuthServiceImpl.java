@@ -147,13 +147,13 @@ public class AuthServiceImpl implements AuthService {
         }
         if (StringUtils.isEmpty(token) && !StringUtils.isEmpty(userId)) {
             token = redisTemplate.opsForValue().get(userId);
-            if(StringUtils.isEmpty(token)){
+            if (StringUtils.isEmpty(token)) {
                 throw new NullPointerException(userId + " :userId not logged in");
             }
         }
         String tokenValue = redisTemplate.opsForValue().get(token);
         String[] vs = tokenValue.split(",");
-        if(StringUtils.isEmpty(userId)){
+        if (StringUtils.isEmpty(userId)) {
             userId = vs[0];
         }
         //vs的长度如果大于1说明token中存在wxId
