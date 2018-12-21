@@ -22,6 +22,7 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
+import java.sql.Time;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -123,11 +124,14 @@ public class AuthServiceImpl implements AuthService {
             boolean flg = UserType.DRIVER.equals(user.getUserType()) || UserType.CUSTOMER.equals(user.getUserType());
             if (flg) {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 31, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(user.getId().toString(), token, 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.opsForValue().set(token, user.getId().toString() + "," + (StringUtils.isEmpty(wxId) ? "" : wxId), 7, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(user.getId().toString(), token, 7, TimeUnit.DAYS);
             }
             //微信小程序多插入一条以wxId为Key的记录
-            if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
+            Boolean flag = UserType.CUSTOMER.equals(user.getUserType()) || UserType.LOAD_SITE.equals(user.getUserType()) || UserType.UNLOAD_SITE.equals(user.getUserType()) || UserType.VISITOR_CUSTOMER_P.equals(user.getUserType()) || UserType.VISITOR_CUSTOMER_U.equals(user.getUserType());
+            if (flag && !StringUtils.isEmpty(wxId)) {
                 log.debug("O createToken: current weiXin openId : {}", wxId);
                 redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
             }
@@ -138,14 +142,29 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void invalidate(String token) {
-        String tokenValue = redisTemplate.opsForValue().get(token);
-        if (StringUtils.isEmpty(tokenValue)) {
-            throw new NullPointerException("Token does not exist");
+    public void invalidate(String token, String userId) {
+        if (StringUtils.isEmpty(token) && StringUtils.isEmpty(userId)) {
+            throw new NullPointerException("token or userId cannot all be empty");
         }
-        String wxId = tokenValue.substring(tokenValue.indexOf(",") + 1);
+        if (StringUtils.isEmpty(token) && !StringUtils.isEmpty(userId)) {
+            token = redisTemplate.opsForValue().get(userId);
+            if (StringUtils.isEmpty(token)) {
+                throw new NullPointerException(userId + " :userId not logged in");
+            }
+        }
+        String tokenValue = redisTemplate.opsForValue().get(token);
+        String[] vs = tokenValue.split(",");
+        if (StringUtils.isEmpty(userId)) {
+            userId = vs[0];
+        }
+        //vs的长度如果大于1说明token中存在wxId
+        String wxId = "";
+        if (vs.length > 1) {
+            wxId = vs[1];
+        }
         redisTemplate.delete(token);
         redisTemplate.delete(wxId);
+        redisTemplate.delete(userId);
     }
 
     @Override
@@ -166,8 +185,10 @@ public class AuthServiceImpl implements AuthService {
             boolean flg = UserType.DRIVER.equals(userInfo.getUserType()) || UserType.CUSTOMER.equals(userInfo.getUserType());
             if (flg) {
                 redisTemplate.expire(token, 31, TimeUnit.DAYS);
+                redisTemplate.expire(userInfo.getId().toString(), 31, TimeUnit.DAYS);
             } else {
                 redisTemplate.expire(token, 7, TimeUnit.DAYS);
+                redisTemplate.expire(userInfo.getId().toString(), 7, TimeUnit.DAYS);
             }
             //微信小程序专属
             if (UserType.CUSTOMER.equals(userInfo.getUserType()) && !StringUtils.isEmpty(wxId)) {

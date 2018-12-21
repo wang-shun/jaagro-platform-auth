@@ -8,6 +8,7 @@ import com.jaagro.auth.web.vo.LoginParamVo;
 import com.jaagro.constant.UserInfo;
 import com.jaagro.utils.BaseResponse;
 import com.jaagro.utils.ResponseStatusCode;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,6 +105,27 @@ public class AuthController {
     }
 
     /**
+     * 提供给其他业务微服务获取当前user使用
+     *
+     * @param token
+     * @return
+     */
+    @GetMapping("/getUserInfoByToken")
+    public BaseResponse<UserInfo> getUserInfoByToken(String token) {
+
+        UserInfo userInfo = null;
+        try {
+            userInfo = authService.getUserByToken(token);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (userInfo != null){
+            return BaseResponse.successInstance(userInfo);
+        }
+        return BaseResponse.queryDataEmpty();
+    }
+
+    /**
      * 延期token，用户每次请求api 都将调用此方法延长token在redis中的有效期
      *
      * @param token
@@ -148,8 +170,8 @@ public class AuthController {
     }
 
     @GetMapping("/invalidateToken")
-    public BaseResponse invalidateToken(@RequestParam("token") String token){
-        authService.invalidate(token);
+    public BaseResponse invalidateToken(String token, String userId){
+        authService.invalidate(token, userId);
         return BaseResponse.successInstance("退出登录");
     }
 }
