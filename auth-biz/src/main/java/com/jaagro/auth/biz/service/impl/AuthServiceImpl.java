@@ -130,7 +130,8 @@ public class AuthServiceImpl implements AuthService {
                 redisTemplate.opsForValue().set(user.getId().toString(), token, 7, TimeUnit.DAYS);
             }
             //微信小程序多插入一条以wxId为Key的记录
-            if (UserType.CUSTOMER.equals(user.getUserType()) && !StringUtils.isEmpty(wxId)) {
+            Boolean flag = UserType.CUSTOMER.equals(user.getUserType()) || UserType.LOAD_SITE.equals(user.getUserType()) || UserType.UNLOAD_SITE.equals(user.getUserType()) || UserType.VISITOR_CUSTOMER_P.equals(user.getUserType()) || UserType.VISITOR_CUSTOMER_U.equals(user.getUserType());
+            if (flag && !StringUtils.isEmpty(wxId)) {
                 log.debug("O createToken: current weiXin openId : {}", wxId);
                 redisTemplate.opsForValue().set(wxId, token, 31, TimeUnit.DAYS);
             }
